@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Sistema de control farmacéutico — v4</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;600;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.25/dist/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root{
+  --blue-900:#021520; --blue-800:#063042; --accent:#19b2d3; --muted:#9fbfc7;
+  --card-shadow: 0 10px 40px rgba(2,18,24,0.6);
+  --success:#06d6a0; --danger:#ff6b6b;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial;background:
+ radial-gradient(1000px 500px at 10% 10%, rgba(15,55,75,0.14), transparent 8%),
+ radial-gradient(800px 400px at 90% 90%, rgba(6,40,60,0.12), transparent 10%),
+ linear-gradient(180deg,var(--blue-900),var(--blue-800)); color:#e8fbff; -webkit-font-smoothing:antialiased;}
+.app{display:flex;min-height:100vh;position:relative;z-index:1}
+/* sidebar */
+.sidebar{width:220px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-right:1px solid rgba(255,255,255,0.03);padding:18px;backdrop-filter:blur(6px);box-shadow:var(--card-shadow);display:flex;flex-direction:column;gap:12px;transition:transform .28s ease}
+.sidebar.hidden{transform:translateX(-120%);}
+.brand{display:flex;gap:12px;align-items:center;margin-bottom:6px}
+.logo{width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,var(--accent),#6fe1d6);display:flex;align-items:center;justify-content:center;font-size:20px}
+.app-name{font-weight:800;color:var(--accent);font-size:0.92rem}
+.side-nav{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.nav-btn{display:flex;gap:12px;align-items:center;padding:10px;border-radius:10px;border:0;background:transparent;color:var(--muted);cursor:pointer;font-weight:700}
+.nav-btn svg{width:20px;height:20px;opacity:0.95}
+.nav-btn.active{background:linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));color:var(--accent);box-shadow:inset 0 1px 0 rgba(255,255,255,0.02)}
+.side-foot{margin-top:auto;color:var(--muted);font-size:0.85rem;display:flex;flex-direction:column;gap:6px}
+
+/* main */
+.main{flex:1;padding:18px;overflow:auto}
+.header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+.h-title{font-weight:800;color:#dff9ff}
+.h-sub{color:var(--muted);font-size:0.9rem}
+.header-actions{display:flex;gap:8px;align-items:center}
+.btn{padding:8px 12px;border-radius:10px;border:0;cursor:pointer;font-weight:800}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid rgba(255,255,255,0.03)}
+.btn-primary{background:linear-gradient(90deg,var(--accent),#6fe1d6);color:#012}
+
+/* dashboard */
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px}
+.card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:14px;border-radius:12px;box-shadow:var(--card-shadow);border:1px solid rgba(255,255,255,0.03)}
+.stat-title{font-size:0.82rem;color:var(--muted);font-weight:700}
+.stat-value{font-weight:900;font-size:1.6rem;color:#eaffff}
+
+/* responsive */
+@media(max-width:1000px){ .grid{grid-template-columns:repeat(2,1fr)} .sidebar{width:72px} .nav-btn span{display:none} .nav-btn{justify-content:center} .logo{width:40px;height:40px} }
+@media(max-width:700px){ .grid{grid-template-columns:1fr} .sidebar{position:fixed;left:0;top:0;height:100vh;z-index:190} .sidebar.hidden{transform:translateX(-120%);} .hamb{display:flex} .main{padding:12px} }
+
+/* tables */
+.table-wrap{overflow:auto}
+table{width:100%;border-collapse:collapse;color:#e9fbff}
+thead th{background:linear-gradient(90deg,#042f3d,#0b4b5b);padding:10px;text-align:left;font-weight:700}
+tbody td{padding:10px;border-bottom:1px dashed rgba(255,255,255,0.03)}
+
+/* modal */
+.modal-back{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:300}
+.modal{width:760px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:18px;border-radius:12px;box-shadow:var(--card-shadow);border:1px solid rgba(255,255,255,0.03)}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* upload preview */
+.upload-preview{width:86px;height:86px;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,0.03);background:#061b24;display:flex;align-items:center;justify-content:center}
+
+/* hamburger */
+.hamb{display:none;align-items:center;gap:10px}
+.hamb button{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:8px;border-radius:8px;color:var(--muted)}
+
+/* small */
+.small-muted{color:var(--muted);font-size:0.9rem}
+.toast{position:fixed;right:18px;top:80px;background:linear-gradient(90deg,#06d6a0,#19b2d3);padding:10px 14px;border-radius:10px;color:#012;box-shadow:0 12px 36px rgba(6,214,160,0.08);display:none;z-index:320}
+</style>
+</head>
+<body>
+<div class="app" id="appRoot" style="opacity:0">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="logo">💊</div>
+      <div>
+        <div class="app-name">Sistema de control farmacéutico</div>
+        <div class="small-muted">App profesional</div>
+      </div>
+    </div>
+
+    <nav class="side-nav" role="navigation" id="sideNav">
+      <button class="nav-btn active" data-page="dashboard" id="navDashboard">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M3 13h8V3H3v10zM13 21h8V11h-8v10zM3 21h8v-6H3v6zM13 3v6h8V3h-8z" fill="currentColor"/></svg><span>Inicio</span>
+      </button>
+      <button class="nav-btn" data-page="entrada" id="navEntrada">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z" fill="currentColor"/></svg><span>Entrada</span>
+      </button>
+      <button class="nav-btn" data-page="salida" id="navSalida">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M16 13v-2H8V9l-5 4 5 4v-2h8z" fill="currentColor"/></svg><span>Salida</span>
+      </button>
+      <button class="nav-btn" data-page="buscar" id="navBuscar">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M21 20l-4.35-4.35" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="1.6"/></svg><span>Buscar</span>
+      </button>
+      <button class="nav-btn" data-page="reportes" id="navReportes">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M7 3h10v4H7zM5 7h14v13H5z" fill="currentColor"/></svg><span>Reportes</span>
+      </button>
+      <button class="nav-btn" data-page="usuarios" id="navUsuarios">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 12a4 4 0 100-8 4 4 0 000 8zm-8 9v-1a6 6 0 016-6h2a6 6 0 016 6v1" fill="currentColor"/></svg><span>Usuarios</span>
+      </button>
+    </nav>
+
+    <div class="side-foot">
+      <div id="sideUser">—</div>
+      <div style="display:flex;gap:8px">
+        <button id="btnLogoutSide" class="btn btn-ghost" style="flex:1">Cerrar sesión</button>
+        <button id="btnToggleMenu" class="btn btn-ghost" style="flex:1">☰</button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="header">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="hamb"><button id="hambToggle">☰</button></div>
+        <div>
+          <div class="h-title" id="pageTitle">Inicio</div>
+          <div class="h-sub" id="pageSub">Resumen general</div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <div id="welcomeName" class="small-muted">Bienvenido</div>
+        <button id="btnPDF" class="btn btn-ghost" title="Generar PDF">📄 Generar PDF</button>
+        <button id="btnBackup" class="btn btn-ghost">Backup</button>
+      </div>
+    </header>
+
+    <!-- Pages -->
+    <section id="dashboard" class="page">
+      <div class="grid" id="dashboardStats">
+        <div class="card">
+          <div class="stat-title">Total medicamentos</div>
+          <div class="stat-value" id="totalMeds">0</div>
+        </div>
+        <div class="card">
+          <div class="stat-title">Existencias totales</div>
+          <div class="stat-value" id="totalUnits">0</div>
+        </div>
+        <div class="card">
+          <div class="stat-title">Entradas (mes)</div>
+          <div class="stat-value" id="monthIn">0</div>
+        </div>
+        <div class="card">
+          <div class="stat-title">Salidas (mes)</div>
+          <div class="stat-value" id="monthOut">0</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:12px">
+        <canvas id="chartMain" height="120"></canvas>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="font-weight:800">Alertas recientes</div>
+          <div class="small-muted">Medicamentos con stock ≤ 10</div>
+        </div>
+        <div id="alertsList" style="margin-top:10px"></div>
+      </div>
+    </section>
+
+    <section id="entrada" class="page" style="display:none">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-weight:800">Agregar / Entrada de medicamento</div>
+          <div><button id="btnOpenAddMed" class="btn btn-primary">➕ Agregar medicamento</button></div>
+        </div>
+
+        <form id="formQuickEntrada" class="form-grid">
+          <input id="q_name" placeholder="Nombre del medicamento" />
+          <input id="q_presentation" placeholder="Presentación" />
+          <input id="q_batch" placeholder="Lote (opcional)" />
+          <input id="q_expiry" type="date" />
+          <input id="q_qty" type="number" min="1" value="1" />
+          <input id="q_unit" placeholder="Unidad (p. ej. pastillas)" />
+          <div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end">
+            <button type="button" id="btnClearQuick" class="btn btn-ghost">Limpiar</button>
+            <button type="submit" class="btn btn-primary">Registrar entrada</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section id="salida" class="page" style="display:none">
+      <div class="card">
+        <div style="font-weight:800;margin-bottom:8px">Registrar salida</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+          <select id="out_select" style="flex:1;padding:10px;border-radius:10px;background:transparent;border:1px solid rgba(255,255,255,0.04);color:#eaffff"></select>
+          <input id="out_qty" type="number" min="1" value="1" style="width:120px;padding:10px;border-radius:10px;background:transparent;border:1px solid rgba(255,255,255,0.04);color:#eaffff"/>
+          <button id="btnRegisterOut" class="btn btn-primary">Registrar salida</button>
+        </div>
+        <div id="out_info" class="small-muted"></div>
+      </div>
+    </section>
+
+    <section id="buscar" class="page" style="display:none">
+      <div class="card">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+          <input id="searchMed" list="medList" placeholder="Buscar medicamento por nombre..." style="flex:1;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:#eaffff"/>
+          <datalist id="medList"></datalist>
+          <button id="btnSearchMed" class="btn btn-primary">Buscar</button>
+        </div>
+        <div id="searchResult" style="margin-top:8px"></div>
+      </div>
+    </section>
+
+    <section id="reportes" class="page" style="display:none">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="font-weight:800">Reportes y exportación</div>
+          <div>
+            <button id="btnExportCSV" class="btn btn-ghost">Exportar CSV</button>
+            <button id="btnExportJSON" class="btn btn-ghost">Exportar JSON</button>
+          </div>
+        </div>
+        <div style="margin-top:12px">Genera un PDF con inventario e historial de movimientos.</div>
+      </div>
+    </section>
+
+    <section id="usuarios" class="page" style="display:none">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><div style="font-weight:800">Gestión de usuarios</div><div class="small-muted">Solo Administrador</div></div>
+          <div><button id="btnCreateUser" class="btn btn-primary">Crear usuario</button></div>
+        </div>
+        <div style="margin-top:12px">
+          <table id="usersTable"><thead><tr><th>Usuario</th><th>Rol</th><th>Acciones</th></tr></thead><tbody></tbody></table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div id="modalRoot" style="display:none"></div>
+<div class="toast" id="toast">Alerta</div>
+
+<script>
+// ---------------- State & storage ----------------
+const STORAGE_KEY = "app_farmacia_v4";
+let state = loadState();
+function loadState(){ try{ const raw = localStorage.getItem(STORAGE_KEY); if(!raw) return { users:{}, currentUser:null, inventory:{}, moves:[], settings:{lowStockThreshold:10}, backups:[] }; return JSON.parse(raw);}catch(e){ return { users:{}, currentUser:null, inventory:{}, moves:[], settings:{lowStockThreshold:10}, backups:[] }; }}
+async function sha256(msg){ const buf=new TextEncoder().encode(msg); const d=await crypto.subtle.digest('SHA-256',buf); return Array.from(new Uint8Array(d)).map(b=>b.toString(16).padStart(2,'0')).join(''); }
+function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+// ---------------- Modal helpers ----------------
+const modalRoot = document.getElementById('modalRoot');
+function showModal(html, wide=false){ modalRoot.innerHTML = `<div class="modal-back"><div class="modal" style="${wide? 'width:900px':''}">${html}</div></div>`; modalRoot.style.display='block'; }
+function closeModal(){ modalRoot.style.display='none'; modalRoot.innerHTML=''; }
+
+// ---------------- Audio beep ----------------
+function playBeep(type='short'){
+  try{
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    const o=ctx.createOscillator(); const g=ctx.createGain();
+    o.type='sine';
+    if(type==='short') o.frequency.setValueAtTime(880,ctx.currentTime);
+    else if(type==='alert') o.frequency.setValueAtTime(520,ctx.currentTime);
+    else o.frequency.setValueAtTime(660,ctx.currentTime);
+    g.gain.setValueAtTime(0.0001,ctx.currentTime);
+    o.connect(g); g.connect(ctx.destination); o.start();
+    g.gain.linearRampToValueAtTime(0.12,ctx.currentTime+0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+0.36);
+    o.stop(ctx.currentTime+0.36);
+  }catch(e){}
+}
+
+// ---------------- Initial auth UI ----------------
+const firstTime = Object.keys(state.users||{}).length === 0;
+document.getElementById('appRoot').style.opacity = 1;
+if(firstTime){
+  showModal(`
+    <h3>Crear administrador</h3>
+    <div style="margin-top:10px">Ingresa tu nombre y contraseña (serás administrador)</div>
+    <input id="m_name" placeholder="Tu nombre" style="width:100%;padding:10px;border-radius:8px;margin-top:8px"/>
+    <input id="m_pwd" placeholder="Contraseña" type="password" style="width:100%;padding:10px;border-radius:8px;margin-top:8px"/>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+      <button id="mCreate" class="btn btn-primary">Crear administrador</button>
+    </div>
+  `);
+  document.getElementById('mCreate').addEventListener('click', async ()=>{
+    const name = document.getElementById('m_name').value.trim(); const pwd = document.getElementById('m_pwd').value;
+    if(!name||!pwd){ alert('Nombre y contraseña requeridos'); return; }
+    const uname = name.toLowerCase().replace(/\s+/g,'_'); const hash = await sha256(pwd);
+    state.users[uname] = { name, hash, role:'admin' }; state.currentUser = uname; saveState(); closeModal(); initApp(); playBeep('short');
+  });
+} else {
+  showModal(`
+    <h3>Iniciar sesión</h3>
+    <div style="margin-top:10px">Selecciona usuario e ingresa contraseña</div>
+    <select id="selUser" style="width:100%;padding:10px;border-radius:8px;margin-top:8px">
+      ${Object.keys(state.users||{}).map(k=>`<option value="${k}">${state.users[k].name} — ${state.users[k].role}</option>`).join('')}
+    </select>
+    <input id="m_pwd_login" placeholder="Contraseña" type="password" style="width:100%;padding:10px;border-radius:8px;margin-top:8px"/>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+      <button id="mLogin" class="btn btn-primary">Ingresar</button>
+    </div>
+  `);
+  document.getElementById('mLogin').addEventListener('click', async ()=>{
+    const sel = document.getElementById('selUser').value; const pwd = document.getElementById('m_pwd_login').value || ''; const hash = await sha256(pwd);
+    if(state.users[sel] && state.users[sel].hash === hash){ state.currentUser = sel; saveState(); closeModal(); initApp(); playBeep('short'); }
+    else alert('Contraseña incorrecta');
+  });
+}
+
+// ---------------- App wiring ----------------
+const pages = document.querySelectorAll('.page');
+const navBtns = document.querySelectorAll('.nav-btn');
+navBtns.forEach(b=> b.addEventListener('click', ()=> { navBtns.forEach(x=> x.classList.remove('active')); b.classList.add('active'); showPage(b.dataset.page); }));
+
+document.getElementById('btnLogoutSide').addEventListener('click', ()=> { if(confirm('Cerrar sesión?')){ state.currentUser=null; saveState(); location.reload(); } });
+document.getElementById('btnToggleMenu').addEventListener('click', ()=> { document.getElementById('sidebar').classList.toggle('hidden'); });
+document.getElementById('hambToggle').addEventListener('click', ()=> { document.getElementById('sidebar').classList.toggle('hidden'); });
+document.getElementById('btnPDF').addEventListener('click', generatePDF);
+document.getElementById('btnBackup').addEventListener('click', ()=> {
+  const blob = new Blob([JSON.stringify(state,null,2) ],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='backup_'+new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')+'.json'; a.click();
+});
+
+document.getElementById('btnOpenAddMed')?.addEventListener('click', ()=> openAddMedModal());
+document.getElementById('btnSearchMed')?.addEventListener('click', ()=> doSearch(document.getElementById('searchMed').value.trim()));
+document.getElementById('btnCreateUser')?.addEventListener('click', ()=> openCreateUserModal());
+
+// ---------------- Navigation ----------------
+function showPage(p){
+  pages.forEach(pg=> pg.style.display = (pg.id===p)?'block':'none');
+  document.getElementById('pageTitle').textContent = {dashboard:'Inicio',entrada:'Entrada',salida:'Salida',buscar:'Buscar',reportes:'Reportes',usuarios:'Usuarios'}[p] || '';
+  document.getElementById('pageSub').textContent = {dashboard:'Resumen general',entrada:'Agregar o registrar entrada',salida:'Registrar salida desde inventario',buscar:'Buscar medicamento por nombre',reportes:'Exportar e imprimir',usuarios:'Gestiona cuentas'}[p] || '';
+  if(p==='salida') populateOutSelect();
+  if(p==='buscar') renderSearchList();
+  if(p==='dashboard') renderDashboard();
+  if(p==='usuarios') renderUsers();
+}
+
+// ---------------- Init after login ----------------
+function initApp(){
+  document.getElementById('welcomeName').textContent = state.users[state.currentUser].name;
+  document.getElementById('sideUser').textContent = state.users[state.currentUser].name + ' · ' + state.users[state.currentUser].role;
+  const userRole = state.users[state.currentUser].role;
+  document.querySelectorAll('.nav-btn').forEach(b=> { if(b.dataset.page==='usuarios') b.style.display = (userRole==='admin')?'flex':'none'; });
+  showPage('dashboard'); renderSummary();
+}
+
+// ---------------- Renderers ----------------
+let chartInstance = null;
+function renderDashboard(){
+  const meds = Object.keys(state.inventory||{});
+  const totalMeds = meds.length;
+  const totalUnits = meds.reduce((s,k)=> s + (Number(state.inventory[k].cantidad)||0),0);
+  const monthIn = (state.moves||[]).filter(m=> m.type==='entrada' && (new Date(m.datetime).getMonth()=== new Date().getMonth())).reduce((s,m)=> s + m.qty,0);
+  const monthOut = (state.moves||[]).filter(m=> m.type==='salida' && (new Date(m.datetime).getMonth()=== new Date().getMonth())).reduce((s,m)=> s + m.qty,0);
+  document.getElementById('totalMeds').textContent = totalMeds;
+  document.getElementById('totalUnits').textContent = totalUnits;
+  document.getElementById('monthIn').textContent = monthIn;
+  document.getElementById('monthOut').textContent = monthOut;
+  const labels = meds.slice(0,10);
+  const data = labels.map(l=> state.inventory[l].cantidad||0);
+  const ctx = document.getElementById('chartMain').getContext('2d');
+  if(chartInstance) chartInstance.destroy();
+  chartInstance = new Chart(ctx, { type:'bar', data:{ labels, datasets:[{ label:'Existencias', data, backgroundColor:'rgba(30,200,220,0.8)'}] }, options:{ responsive:true } });
+  const alerts = meds.filter(k=> Number(state.inventory[k].cantidad) <= (state.settings.lowStockThreshold||10));
+  const alEl = document.getElementById('alertsList'); alEl.innerHTML='';
+  if(alerts.length===0) alEl.innerHTML = '<div class="small-muted">No hay alertas</div>';
+  alerts.forEach(k=>{
+    const it = state.inventory[k];
+    const div = document.createElement('div'); div.style.display='flex'; div.style.justifyContent='space-between'; div.style.padding='8px 0'; div.innerHTML = `<div><strong>${k}</strong><div class="small-muted">${it.presentation||''} · ${it.unit||''}</div></div><div style="color:var(--danger);font-weight:800">${it.cantidad}</div>`;
+    alEl.appendChild(div);
+    playBeep('alert');
+  });
+}
+
+// ---------------- Search / render ----------------
+function renderSearchList(){
+  const keys = Object.keys(state.inventory||{});
+  const list = keys.map(k=> `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px dashed rgba(255,255,255,0.02)"><div><strong>${k}</strong><div class="small-muted">${state.inventory[k].presentation||''}</div></div><div><button class="btn btn-ghost" onclick="openViewMed('${k}')">Ver</button></div></div>`).join('');
+  document.getElementById('searchResult').innerHTML = list || '<div class="small-muted">No hay resultados</div>';
+}
+
+// ---------------- Add med modal ----------------
+function openAddMedModal(editName){
+  const isEdit = !!editName;
+  const med = isEdit ? state.inventory[editName] : {};
+  showModal(`
+    <h3>${isEdit?'Editar':'Agregar'} medicamento</h3>
+    <div style="margin-top:10px">
+      <div class="form-grid">
+        <input id="m_name" placeholder="Nombre" value="${isEdit?editName:''}" ${isEdit?'readonly':''}/>
+        <input id="m_presentation" placeholder="Presentación" value="${med.presentation||''}"/>
+        <input id="m_unit" placeholder="Unidad (p. ej. pastillas)" value="${med.unit||''}"/>
+        <input id="m_qty" type="number" min="0" value="${med.cantidad||0}"/>
+      </div>
+      <input id="m_batch" placeholder="Lote" style="width:100%;padding:8px;margin-top:8px;border-radius:8px" value="${med.batch||''}"/>
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+        <input id="m_expiry" type="date" style="flex:1;padding:8px;border-radius:8px" value="${med.expiry||''}"/>
+        <input id="m_imgfile" type="file" accept="image/*" style="flex:1;padding:8px;border-radius:8px"/>
+        <div class="upload-preview" id="uploadPreview">${med.img? '<img src="'+med.img+'" style="width:100%;height:100%;object-fit:cover"/>':'💊'}</div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+        <button id="mCancel" class="btn btn-ghost">Cancelar</button>
+        <button id="mSave" class="btn btn-primary">${isEdit?'Guardar':'Agregar'}</button>
+      </div>
+    </div>
+  `, true);
+  const fileInput = document.getElementById('m_imgfile');
+  fileInput.addEventListener('change', ()=> {
+    const p = document.getElementById('uploadPreview');
+    if(fileInput.files && fileInput.files[0]){
+      const reader = new FileReader();
+      reader.onload = e=> p.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover"/>`;
+      reader.readAsDataURL(fileInput.files[0]);
+    }
+  });
+  document.getElementById('mCancel').addEventListener('click', closeModal);
+  document.getElementById('mSave').addEventListener('click', async ()=> {
+    const name = document.getElementById('m_name').value.trim();
+    if(!name){ alert('Nombre requerido'); return; }
+    state.inventory = state.inventory || {};
+    const fileInput = document.getElementById('m_imgfile');
+    const qty = Number(document.getElementById('m_qty').value) || 0;
+    function finalize(imgData){
+      state.inventory[name] = {
+        presentation: document.getElementById('m_presentation').value.trim(),
+        unit: document.getElementById('m_unit').value.trim(),
+        cantidad: (Number(state.inventory[name] && state.inventory[name].cantidad)||0) + qty,
+        batch: document.getElementById('m_batch').value.trim(),
+        expiry: document.getElementById('m_expiry').value || '',
+        img: imgData || (state.inventory[name] && state.inventory[name].img) || '',
+        lastIn: new Date().toISOString()
+      };
+      if(qty>0){
+        state.moves = state.moves || [];
+        state.moves.push({ id:Date.now().toString(36), type:'entrada', name, qty, datetime:new Date().toISOString(), notes:'Creado/Entrada inicial', user: state.currentUser });
+      }
+      saveState(); closeModal(); renderDashboard(); showToast('Medicamento guardado'); playBeep('short');
+    }
+    if(fileInput && fileInput.files && fileInput.files[0]){
+      const reader = new FileReader();
+      reader.onload = e=> finalize(e.target.result);
+      reader.readAsDataURL(fileInput.files[0]);
+    } else finalize(null);
+  });
+}
+
+// ---------------- View med ----------------
+window.openViewMed = function(name){
+  const it = state.inventory[name];
+  if(!it) return showToast('No encontrado');
+  showModal(`
+    <h3>${name}</h3>
+    <div style="display:flex;gap:12px;align-items:center;margin-top:10px">
+      <div class="upload-preview">${it.img? '<img src="'+it.img+'" style="width:100%;height:100%;object-fit:cover"/>':'💊'}</div>
+      <div style="flex:1">
+        <div class="small-muted">${it.presentation||''} · ${it.unit||''}</div>
+        <div style="font-weight:900;font-size:1.4rem;margin-top:6px">${it.cantidad}</div>
+        <div class="small-muted">Última entrada: ${it.lastIn?new Date(it.lastIn).toLocaleString():'-'}</div>
+      </div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
+      <input id="addFromView" type="number" min="1" value="1" style="width:120px;padding:8px;border-radius:8px"/>
+      <button id="btnAddFromView" class="btn btn-primary">Agregar unidades</button>
+      <button id="btnCloseView" class="btn btn-ghost">Cerrar</button>
+    </div>
+  `, true);
+  document.getElementById('btnCloseView').addEventListener('click', closeModal);
+  document.getElementById('btnAddFromView').addEventListener('click', ()=> {
+    const v = Number(document.getElementById('addFromView').value) || 0;
+    if(v<=0) return showToast('Cantidad inválida');
+    state.inventory[name].cantidad = (Number(state.inventory[name].cantidad)||0) + v;
+    state.moves = state.moves || [];
+    state.moves.push({ id:Date.now().toString(36), type:'entrada', name, qty:v, datetime:new Date().toISOString(), notes:'Añadido desde vista', user: state.currentUser });
+    saveState(); closeModal(); renderDashboard(); showToast('Unidades agregadas'); playBeep('short');
+  });
+}
+
+// ---------------- Quick entrada ----------------
+document.getElementById('formQuickEntrada').addEventListener('submit', (e)=>{
+  e.preventDefault();
+  const name = document.getElementById('q_name').value.trim();
+  if(!name) return showToast('Nombre requerido');
+  state.inventory = state.inventory || {};
+  if(!state.inventory[name]) state.inventory[name] = { cantidad:0 };
+  const qty = Number(document.getElementById('q_qty').value) || 0;
+  state.inventory[name].presentation = document.getElementById('q_presentation').value.trim();
+  state.inventory[name].batch = document.getElementById('q_batch').value.trim();
+  state.inventory[name].expiry = document.getElementById('q_expiry').value || '';
+  state.inventory[name].unit = document.getElementById('q_unit').value.trim();
+  state.inventory[name].cantidad = (Number(state.inventory[name].cantidad)||0) + qty;
+  state.inventory[name].lastIn = new Date().toISOString();
+  state.moves = state.moves || [];
+  state.moves.push({ id:Date.now().toString(36), type:'entrada', name, qty, datetime:new Date().toISOString(), notes:'Entrada rápida', user: state.currentUser });
+  saveState(); document.getElementById('formQuickEntrada').reset(); renderDashboard(); showPage('buscar'); showToast('Entrada registrada'); playBeep('short');
+});
+
+// ---------------- Salidas ----------------
+function populateOutSelect(){
+  const sel = document.getElementById('out_select'); sel.innerHTML='';
+  const keys = Object.keys(state.inventory||{});
+  if(keys.length===0){ sel.innerHTML='<option>No hay medicamentos</option>'; return; }
+  keys.forEach(k=>{ const it = state.inventory[k]; const opt = document.createElement('option'); opt.value=k; opt.textContent = `${k} — ${it.cantidad} ${it.unit||''}`; sel.appendChild(opt); });
+  sel.addEventListener('change', ()=> { const it = state.inventory[sel.value]; document.getElementById('out_info').textContent = it ? `Disponibles: ${it.cantidad} ${it.unit||''}` : ''; });
+  if(sel.options[0]) sel.dispatchEvent(new Event('change'));
+}
+document.getElementById('btnRegisterOut').addEventListener('click', ()=>{
+  const sel = document.getElementById('out_select'); const name = sel.value;
+  const qty = Number(document.getElementById('out_qty').value) || 0;
+  if(!name || qty<=0) return showToast('Selecciona y cantidad válida');
+  if((state.inventory[name].cantidad||0) < qty) return showToast('No hay suficientes unidades');
+  state.inventory[name].cantidad -= qty; state.inventory[name].lastOut = new Date().toISOString();
+  state.moves = state.moves || []; state.moves.push({ id:Date.now().toString(36), type:'salida', name, qty, datetime:new Date().toISOString(), notes:'Salida manual', user: state.currentUser });
+  saveState(); renderDashboard(); showPage('buscar'); showToast('Salida registrada'); playBeep('short');
+});
+
+// ---------------- Search ----------------
+function doSearch(q){
+  if(!q) return showToast('Escribe un término');
+  const key = Object.keys(state.inventory||{}).find(k=> k.toLowerCase() === q.toLowerCase());
+  if(!key) return showToast('No encontrado');
+  openViewMed(key);
+}
+
+// ---------------- Users ----------------
+function renderUsers(){
+  const tbody = document.querySelector('#usersTable tbody'); tbody.innerHTML='';
+  Object.keys(state.users||{}).forEach(k=>{
+    const u = state.users[k];
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${u.name}</td><td>${u.role}</td><td>${u.role!=='admin'? '<button class="btn btn-ghost" data-user="'+k+'" onclick="deleteUser(this.dataset.user)">Eliminar</button>':'-'}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+window.deleteUser = function(username){ if(!confirm('Eliminar usuario?')) return; delete state.users[username]; saveState(); renderUsers(); showToast('Usuario eliminado'); playBeep('short'); }
+function openCreateUserModal(){
+  showModal(`
+    <h3>Crear usuario</h3>
+    <input id="newName" placeholder="Nombre" style="width:100%;padding:8px;border-radius:8px"/>
+    <input id="newPwd" placeholder="Contraseña" type="password" style="width:100%;padding:8px;border-radius:8px;margin-top:8px"/>
+    <select id="newRole" style="width:100%;padding:8px;border-radius:8px;margin-top:8px"><option value="user">Usuario</option><option value="admin">Administrador</option></select>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px"><button id="cancelNew" class="btn btn-ghost">Cancelar</button><button id="saveNew" class="btn btn-primary">Crear</button></div>
+  `, true);
+  document.getElementById('cancelNew').addEventListener('click', closeModal);
+  document.getElementById('saveNew').addEventListener('click', async ()=>{
+    const name = document.getElementById('newName').value.trim(); const pwd = document.getElementById('newPwd').value; const role = document.getElementById('newRole').value;
+    if(!name||!pwd){ alert('Faltan datos'); return; }
+    const uname = name.toLowerCase().replace(/\s+/g,'_'); const h = await sha256(pwd);
+    state.users[uname] = { name, hash:h, role }; saveState(); closeModal(); renderUsers(); showToast('Usuario creado'); playBeep('short');
+  });
+}
+
+// ---------------- PDF & export ----------------
+async function generatePDF(){
+  const { jsPDF } = window.jspdf; const doc = new jsPDF();
+  const uname = state.currentUser && state.users[state.currentUser] ? state.users[state.currentUser].name : 'Usuario';
+  doc.setFontSize(14); doc.text('Sistema de control farmacéutico',14,18);
+  doc.setFontSize(10); doc.text(`Generado por: ${uname} — ${new Date().toLocaleString()}`,14,26);
+  doc.setDrawColor(30,140,160); doc.line(14,28,196,28);
+  const invBody = Object.keys(state.inventory||{}).map(k=> { const it = state.inventory[k]; return [k, it.presentation||'', it.unit||'', String(it.cantidad||0), it.expiry||'', it.batch||'']; });
+  doc.autoTable({ head:[['Medicamento','Presentación','Unidad','Existencia','Caducidad','Lote']], body:invBody, startY:36, styles:{fontSize:8} });
+  doc.save('inventario_'+new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')+'.pdf'); playBeep('short'); showToast('PDF generado');
+}
+
+// ---------------- Exports ----------------
+document.getElementById('btnExportCSV')?.addEventListener('click', ()=> {
+  const rows = [['Tipo','Medicamento','Cantidad','FechaHora','Notas','Usuario']]; (state.moves||[]).forEach(m=> rows.push([m.type,m.name,m.qty,new Date(m.datetime).toLocaleString(),m.notes||'', state.users && state.users[m.user] ? state.users[m.user].name : m.user || ''])); const csv = rows.map(r=> r.map(c=> `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n'); const blob = new Blob([csv],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='historial_'+new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')+'.csv'; a.click();
+});
+document.getElementById('btnExportJSON')?.addEventListener('click', ()=> {
+  const blob = new Blob([JSON.stringify(state,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='estado_'+new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')+'.json'; a.click();
+});
+
+// ---------------- Utils ----------------
+function showToast(msg, t=2500){ const toast=document.getElementById('toast'); toast.textContent=msg; toast.style.display='block'; setTimeout(()=> toast.style.display='none', t); }
+
+// autosave backups every 60s
+setInterval(()=>{ state.backups = state.backups || []; state.backups.push({ date:new Date().toISOString(), inventory:{...state.inventory}, movesSnapshot: state.moves?state.moves.slice(-30):[] }); if(state.backups.length>80) state.backups.shift(); saveState(); }, 60000);
+
+// initial render if already logged
+if(state.currentUser) initApp();
+else { /* modal handles */ }
+
+// expose
+window.doSearch = doSearch;
+window.openAddMedModal = openAddMedModal;
+window.openViewMed = openViewMed;
+window.openCreateUserModal = openCreateUserModal;
+
+</script>
+</body>
+</html>
